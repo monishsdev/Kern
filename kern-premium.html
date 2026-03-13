@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kern OS</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Geist:wght@200;300;400;500;600&family=Geist+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#eeeae4;
+  --bg2:#e6e1da;
+  --surface:rgba(255,254,252,0.62);
+  --surface-hover:rgba(255,254,252,0.80);
+  --border:rgba(255,255,255,0.85);
+  --border-subtle:rgba(200,192,180,0.35);
+  --text:#1a1814;
+  --text-2:#6b6560;
+  --text-3:#a09890;
+  --gold:#9a7c52;
+  --gold-light:#c4a06e;
+  --glass-shadow:0 8px 32px rgba(80,60,40,0.10),0 2px 8px rgba(80,60,40,0.06),0 0 0 1px rgba(255,255,255,0.7) inset,0 1px 0 rgba(255,255,255,0.95) inset;
+  --glass-shadow-lg:0 20px 60px rgba(60,40,20,0.14),0 4px 16px rgba(60,40,20,0.08),0 0 0 1px rgba(255,255,255,0.75) inset,0 1px 0 rgba(255,255,255,0.95) inset;
+  --radius:20px;
+  --radius-sm:12px;
+  --radius-pill:100px;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Geist',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  cursor:default;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── MESH BG ── */
+.mesh{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);will-change:transform}
+.o1{width:800px;height:800px;top:-300px;left:-200px;background:radial-gradient(#e8ddd0,#f0e8de 60%,transparent);opacity:.55;animation:drift1 20s ease-in-out infinite alternate}
+.o2{width:600px;height:600px;bottom:-200px;right:-100px;background:radial-gradient(#d4e4f0,#dcedf8 60%,transparent);opacity:.45;animation:drift2 25s ease-in-out infinite alternate}
+.o3{width:500px;height:500px;top:30%;left:40%;background:radial-gradient(#ede4d8,#f5ede4 60%,transparent);opacity:.4;animation:drift3 18s ease-in-out infinite alternate}
+.o4{width:400px;height:400px;top:60%;left:15%;background:radial-gradient(#dff0e8,#e8f5ee 60%,transparent);opacity:.35;animation:drift1 22s ease-in-out infinite alternate-reverse}
+@keyframes drift1{to{transform:translate(40px,50px) scale(1.1)}}
+@keyframes drift2{to{transform:translate(-30px,40px) scale(1.08)}}
+@keyframes drift3{to{transform:translate(20px,-30px) scale(1.05)}}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.018;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ── GLASS BASE ── */
+.glass{
+  background:var(--surface);
+  backdrop-filter:blur(32px) saturate(1.8) brightness(1.04);
+  -webkit-backdrop-filter:blur(32px) saturate(1.8) brightness(1.04);
+  border:1px solid var(--border);
+  box-shadow:var(--glass-shadow);
+}
+.glass-lg{
+  background:var(--surface);
+  backdrop-filter:blur(48px) saturate(2) brightness(1.05);
+  -webkit-backdrop-filter:blur(48px) saturate(2) brightness(1.05);
+  border:1px solid var(--border);
+  box-shadow:var(--glass-shadow-lg);
+}
+
+/* ── LIQUID BUTTON ── */
+.btn{
+  position:relative;
+  overflow:hidden;
+  border:none;
+  cursor:pointer;
+  font-family:'Geist',sans-serif;
+  font-weight:500;
+  letter-spacing:-0.2px;
+  transition:transform .25s cubic-bezier(.4,0,.2,1),box-shadow .25s cubic-bezier(.4,0,.2,1);
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.btn::before{/* gloss sheen */
+  content:'';position:absolute;top:0;left:0;right:0;height:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.28) 0%,transparent 100%);
+  border-radius:inherit;pointer-events:none;z-index:1;
+}
+.btn .ripple-wrap{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:0}
+.btn:hover{transform:translateY(-2px)}
+.btn:active{transform:translateY(0) scale(.98)}
+
+.btn-dark{
+  background:linear-gradient(160deg,#2c2820 0%,#1a1610 100%);
+  color:#f5f2ee;
+  padding:14px 32px;
+  border-radius:var(--radius-pill);
+  font-size:15px;
+  box-shadow:0 4px 20px rgba(30,20,10,.28),0 1px 0 rgba(255,255,255,.1) inset,0 -1px 0 rgba(0,0,0,.2) inset;
+}
+.btn-dark:hover{box-shadow:0 8px 32px rgba(30,20,10,.38),0 1px 0 rgba(255,255,255,.12) inset}
+
+.btn-glass{
+  background:rgba(255,254,252,.65);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  color:var(--text);
+  padding:14px 28px;
+  border-radius:var(--radius-pill);
+  font-size:15px;
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 4px 16px rgba(60,40,20,.08),0 1px 0 rgba(255,255,255,.95) inset;
+}
+.btn-glass:hover{background:rgba(255,254,252,.82);box-shadow:0 8px 28px rgba(60,40,20,.13),0 1px 0 rgba(255,255,255,.95) inset}
+
+.btn-pill-sm{
+  padding:8px 18px;
+  border-radius:var(--radius-pill);
+  font-size:13px;
+  font-weight:500;
+  background:rgba(255,254,252,.7);
+  backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.85);
+  color:var(--text-2);
+  box-shadow:0 2px 8px rgba(60,40,20,.06),0 1px 0 rgba(255,255,255,.9) inset;
+  transition:all .2s cubic-bezier(.4,0,.2,1);
+}
+.btn-pill-sm:hover{background:rgba(255,254,252,.88);color:var(--text);transform:translateY(-1px)}
+.btn-pill-sm:active{transform:scale(.97)}
+
+.btn-install{
+  padding:7px 16px;
+  border-radius:var(--radius-pill);
+  font-size:12.5px;
+  font-weight:600;
+  background:rgba(60,120,220,.12);
+  border:1px solid rgba(60,120,220,.2);
+  color:#2a72d8;
+  cursor:pointer;
+  transition:all .2s;
+  font-family:'Geist',sans-serif;
+}
+.btn-install:hover{background:rgba(60,120,220,.2);transform:translateY(-1px)}
+.btn-install.installed{background:rgba(80,180,80,.1);border-color:rgba(80,180,80,.2);color:#2a8a40}
+.btn-install.installing{opacity:.6;pointer-events:none}
+
+/* ripple */
+@keyframes ripple-expand{0%{transform:scale(0);opacity:.35}100%{transform:scale(4);opacity:0}}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.6);animation:ripple-expand .6s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none;z-index:2}
+
+/* ── NAVBAR ── */
+nav{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  z-index:200;
+  display:flex;align-items:center;gap:4px;
+  padding:8px 8px 8px 20px;
+  border-radius:var(--radius-pill);
+  background:rgba(238,234,228,.78);
+  backdrop-filter:blur(40px) saturate(2);
+  -webkit-backdrop-filter:blur(40px) saturate(2);
+  border:1px solid rgba(255,255,255,.88);
+  box-shadow:0 8px 32px rgba(60,40,20,.1),0 1px 0 rgba(255,255,255,.9) inset;
+  white-space:nowrap;
+}
+.nav-logo{font-family:'Playfair Display',serif;font-size:17px;font-weight:600;letter-spacing:-.3px;color:var(--text);margin-right:8px}
+.nav-links{display:flex;align-items:center;gap:2px}
+.nav-link{
+  padding:7px 16px;border-radius:var(--radius-pill);
+  font-size:13.5px;font-weight:400;color:var(--text-2);
+  cursor:pointer;transition:all .2s;border:none;background:none;
+  font-family:'Geist',sans-serif;
+}
+.nav-link:hover,.nav-link.active{color:var(--text);background:rgba(255,254,252,.65)}
+.nav-sep{width:1px;height:18px;background:var(--border-subtle);margin:0 4px}
+
+/* ── SECTIONS (pages) ── */
+.page{display:none;position:relative;z-index:2;padding-top:88px;min-height:100vh}
+.page.active{display:block}
+
+/* ── HERO ── */
+.hero{
+  display:grid;grid-template-columns:1fr auto;gap:60px;
+  align-items:center;padding:60px 72px 80px;max-width:1400px;margin:0 auto;
+}
+.hero-left{max-width:560px}
+.chip{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 14px 6px 10px;
+  border-radius:var(--radius-pill);
+  background:rgba(255,254,252,.72);
+  backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 2px 10px rgba(60,40,20,.06);
+  margin-bottom:28px;font-size:12.5px;color:var(--text-2);font-weight:500;
+}
+.chip-dot{width:7px;height:7px;border-radius:50%;background:#34c759;box-shadow:0 0 0 3px rgba(52,199,89,.18);animation:chip-pulse 2.5s ease infinite}
+@keyframes chip-pulse{0%,100%{box-shadow:0 0 0 3px rgba(52,199,89,.18)}50%{box-shadow:0 0 0 6px rgba(52,199,89,.08)}}
+h1{font-family:'Playfair Display',serif;font-size:72px;line-height:1.0;letter-spacing:-3px;color:var(--text);margin-bottom:20px}
+h1 em{font-style:italic;color:var(--gold)}
+.hero-sub{font-size:17px;font-weight:300;color:var(--text-2);line-height:1.65;letter-spacing:-.1px;margin-bottom:36px;max-width:440px}
+.hero-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.hero-arrow{font-size:15px;font-weight:400;color:var(--text-2);cursor:pointer;display:flex;align-items:center;gap:6px;transition:color .2s;background:none;border:none;font-family:'Geist',sans-serif}
+.hero-arrow:hover{color:var(--text)}
+.hero-arrow span{transition:transform .2s;font-size:18px}
+.hero-arrow:hover span{transform:translateX(4px)}
+
+/* ── WATCH ── */
+.watch-wrap{display:flex;flex-direction:column;align-items:center;gap:24px;padding:20px 0 40px}
+.watch-outer{
+  position:relative;
+  width:300px;height:300px;
+  border-radius:72px;
+  background:linear-gradient(145deg,#ddd8d0 0%,#ccc6be 50%,#bdb8b0 100%);
+  box-shadow:
+    0 60px 120px rgba(40,30,20,.32),
+    0 20px 40px rgba(40,30,20,.14),
+    0 4px 0 rgba(255,255,255,.6),
+    0 -2px 0 rgba(0,0,0,.08),
+    inset 0 2px 4px rgba(255,255,255,.5),
+    inset 0 -2px 4px rgba(0,0,0,.06);
+  padding:9px;
+  animation:float 8s ease-in-out infinite;
+  cursor:pointer;
+}
+@keyframes float{0%,100%{transform:translateY(0) rotate(-.5deg)}50%{transform:translateY(-12px) rotate(.5deg)}}
+.crown{position:absolute;right:-13px;border-radius:4px;background:linear-gradient(90deg,#c0b8b0,#d8d0c8,#c0b8b0);box-shadow:2px 0 8px rgba(0,0,0,.1),inset -1px 0 0 rgba(255,255,255,.4)}
+.c1{top:68px;height:20px;width:12px}.c2{top:120px;height:34px;width:13px}.c3{top:170px;height:16px;width:11px}
+.watch-screen{
+  width:100%;height:100%;border-radius:64px;overflow:hidden;position:relative;
+  background:#0d0d0f;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),inset 0 4px 16px rgba(0,0,0,.5);
+}
+/* watch faces */
+.wface{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;transition:opacity .5s cubic-bezier(.4,0,.2,1);pointer-events:none;border-radius:64px;overflow:hidden}
+.wface.show{opacity:1;pointer-events:all}
+
+.face-serene{background:radial-gradient(ellipse at 40% 30%,#1e1c20,#0d0c0e)}
+.face-serene .wt{font-family:'Playfair Display',serif;font-style:italic;font-size:66px;letter-spacing:-3px;color:#f0ece8;line-height:1;text-shadow:0 0 40px rgba(240,236,232,.1)}
+.face-serene .wd{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:3.5px;color:rgba(240,236,232,.28);margin-top:10px;text-transform:uppercase}
+.face-serene .ws{width:20px;height:1px;background:linear-gradient(90deg,transparent,rgba(240,236,232,.2),transparent);margin:10px auto 0}
+
+.face-glass{overflow:hidden}
+.face-glass .glass-bg{
+  position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.02) 100%);
+  backdrop-filter:blur(40px);
+}
+.face-glass .glass-blob1{position:absolute;width:180px;height:180px;border-radius:50%;background:radial-gradient(rgba(120,180,255,.25),transparent 70%);top:-60px;left:-40px;filter:blur(20px);animation:blob1 10s ease infinite alternate}
+.face-glass .glass-blob2{position:absolute;width:140px;height:140px;border-radius:50%;background:radial-gradient(rgba(180,140,255,.2),transparent 70%);bottom:-40px;right:-20px;filter:blur(18px);animation:blob2 13s ease infinite alternate}
+@keyframes blob1{to{transform:translate(20px,30px) scale(1.1)}}
+@keyframes blob2{to{transform:translate(-15px,20px) scale(1.08)}}
+.face-glass .glass-panel{
+  position:absolute;inset:20px;border-radius:46px;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.15);
+  backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2);
+}
+.face-glass .wt{font-family:'Geist',sans-serif;font-weight:200;font-size:62px;letter-spacing:-4px;color:rgba(255,255,255,.92);line-height:1;position:relative;z-index:2}
+.face-glass .wd{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:2.5px;color:rgba(200,220,255,.45);margin-top:8px;position:relative;z-index:2}
+
+.face-warm{background:linear-gradient(160deg,#18120a,#0e0908)}
+.face-warm .gold-ring{position:absolute;width:250px;height:250px;border-radius:50%;border:1px solid rgba(154,124,82,.1);top:25px;left:25px}
+.face-warm .gold-ring2{position:absolute;width:210px;height:210px;border-radius:50%;border:1px solid rgba(154,124,82,.06);top:45px;left:45px}
+.face-warm .wt{font-family:'Playfair Display',serif;font-style:italic;font-size:62px;letter-spacing:-2.5px;background:linear-gradient(135deg,#c4a06e,#e8cc8a 40%,#9a7c52);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;position:relative;z-index:1}
+.face-warm .wd{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:3px;color:rgba(154,124,82,.38);margin-top:10px;position:relative;z-index:1}
+
+/* apps overlay */
+.apps-overlay{
+  position:absolute;inset:0;border-radius:64px;
+  background:rgba(10,10,12,.88);
+  backdrop-filter:blur(28px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  opacity:0;pointer-events:none;z-index:30;
+  transition:opacity .35s cubic-bezier(.4,0,.2,1);
+}
+.apps-overlay.open{opacity:1;pointer-events:all}
+.wapps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;padding:8px 18px}
+.wapp{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:transform .18s cubic-bezier(.4,0,.2,1)}
+.wapp:hover{transform:scale(1.1) translateY(-2px)}
+.wapp:active{transform:scale(.95)}
+.wapp-icon{width:50px;height:50px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:23px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);box-shadow:0 4px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.14);transition:all .18s}
+.wapp:hover .wapp-icon{background:rgba(255,255,255,.12);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.wapp-name{font-size:9px;color:rgba(255,255,255,.38);font-weight:400;font-family:'Geist',sans-serif}
+.apps-close{font-size:10.5px;color:rgba(255,255,255,.28);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 18px;cursor:pointer;font-family:'Geist Mono',monospace;letter-spacing:.5px;transition:all .2s}
+.apps-close:hover{color:rgba(255,255,255,.6);border-color:rgba(255,255,255,.25)}
+
+.wpips{display:flex;gap:7px}
+.wpip{width:6px;height:6px;border-radius:50%;background:rgba(100,90,80,.3);cursor:pointer;transition:all .25s}
+.wpip.on{background:var(--text);transform:scale(1.2)}
+.wtap{font-size:12px;color:var(--text-3);animation:breathe 4s ease infinite;letter-spacing:-.1px}
+@keyframes breathe{0%,100%{opacity:.4}50%{opacity:.8}}
+
+/* ── FEATURES page ── */
+.page-inner{max-width:1200px;margin:0 auto;padding:40px 72px 80px}
+.page-header{margin-bottom:48px}
+.section-label{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sl-line{width:18px;height:1px;background:var(--gold)}
+.sl-text{font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}
+.page-title{font-family:'Playfair Display',serif;font-size:52px;letter-spacing:-2.5px;line-height:1.05;color:var(--text);margin-bottom:14px}
+.page-title em{font-style:italic;color:var(--gold)}
+.page-sub{font-size:16px;font-weight:300;color:var(--text-2);line-height:1.7;max-width:500px}
+
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.feat-card{
+  padding:28px;border-radius:var(--radius);cursor:default;
+  transition:transform .3s cubic-bezier(.4,0,.2,1),box-shadow .3s cubic-bezier(.4,0,.2,1);
+  position:relative;overflow:hidden;
+}
+.feat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent)}
+.feat-card:hover{transform:translateY(-4px)}
+.feat-card:hover.glass{box-shadow:var(--glass-shadow-lg)}
+.fi{width:44px;height:44px;border-radius:14px;background:rgba(154,124,82,.1);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;border:1px solid rgba(154,124,82,.12)}
+.fn{font-size:15.5px;font-weight:600;letter-spacing:-.3px;margin-bottom:7px}
+.fb{font-size:13.5px;font-weight:300;color:var(--text-2);line-height:1.55;letter-spacing:-.1px}
+.ftag{display:inline-block;margin-top:12px;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:1.5px;padding:3px 9px;border-radius:100px;background:rgba(154,124,82,.1);color:var(--gold)}
+
+/* ── APP STORE page ── */
+.store-search{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 20px;border-radius:var(--radius-pill);
+  margin-bottom:32px;width:100%;max-width:480px;
+  background:rgba(255,254,252,.7);
+  backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,.88);
+  box-shadow:0 4px 16px rgba(60,40,20,.07);
+}
+.store-search input{flex:1;background:none;border:none;outline:none;font-size:14.5px;font-family:'Geist',sans-serif;color:var(--text);letter-spacing:-.1px}
+.store-search input::placeholder{color:var(--text-3)}
+.store-search .icon{color:var(--text-3);font-size:16px}
+.store-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
+.filter-pill{
+  padding:7px 18px;border-radius:100px;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .2s;border:1px solid rgba(255,255,255,.8);
+  background:rgba(255,254,252,.55);backdrop-filter:blur(14px);color:var(--text-2);
+  font-family:'Geist',sans-serif;
+}
+.filter-pill:hover{background:rgba(255,254,252,.8);color:var(--text)}
+.filter-pill.on{background:var(--text);color:#f5f2ee;border-color:var(--text)}
+.apps-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.app-card{
+  padding:20px;border-radius:var(--radius);display:flex;align-items:center;gap:16px;
+  transition:all .25s cubic-bezier(.4,0,.2,1);cursor:pointer;
+}
+.app-card:hover{transform:translateX(4px)}
+.app-card:hover.glass{box-shadow:var(--glass-shadow-lg)}
+.app-ico{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.app-info{flex:1;min-width:0}
+.app-name{font-size:14.5px;font-weight:600;letter-spacing:-.2px;margin-bottom:3px}
+.app-desc{font-size:12.5px;color:var(--text-2);font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-meta{display:flex;align-items:center;gap:6px;margin-top:4px}
+.app-size{font-family:'Geist Mono',monospace;font-size:11px;color:var(--text-3)}
+.app-stars{font-size:11px;color:var(--gold-light)}
+.app-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.storage-bar-mini{width:60px;height:3px;background:rgba(40,30,20,.08);border-radius:100px;overflow:hidden}
+.sbm-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--gold),var(--gold-light))}
+.used-text{font-family:'Geist Mono',monospace;font-size:10px;color:var(--text-3)}
+.app-card.installed-app{opacity:.6}
+
+/* ── THEMES page ── */
+.themes-layout{display:grid;grid-template-columns:1fr 360px;gap:32px;align-items:start}
+.theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.theme-card{
+  height:120px;border-radius:var(--radius);cursor:pointer;position:relative;overflow:hidden;
+  transition:all .3s cubic-bezier(.4,0,.2,1);border:2px solid transparent;
+}
+.theme-card::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.08) 0%,transparent 50%)}
+.theme-card:hover{transform:scale(1.03);box-shadow:0 12px 40px rgba(0,0,0,.15)}
+.theme-card.chosen{border-color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.theme-card .tc-label{position:absolute;bottom:12px;left:14px;font-size:12px;font-weight:600;letter-spacing:-.1px}
+.tc-check{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:11px;opacity:0;transition:opacity .2s}
+.theme-card.chosen .tc-check{opacity:1;background:rgba(255,255,255,.9);color:var(--text)}
+
+/* theme variants */
+.tv-pearl{background:linear-gradient(135deg,#f0ece6,#e4dfd8)}.tv-pearl .tc-label{color:rgba(40,30,20,.4)}
+.tv-midnight{background:linear-gradient(135deg,#16161a,#1e1e24)}.tv-midnight .tc-label{color:rgba(255,255,255,.3)}
+.tv-ocean{background:linear-gradient(135deg,#0d1e36,#142a4a)}.tv-ocean .tc-label{color:rgba(140,180,240,.4)}
+.tv-dusk{background:linear-gradient(135deg,#1e1228,#2a1a38)}.tv-dusk .tc-label{color:rgba(200,160,240,.35)}
+.tv-forest{background:linear-gradient(135deg,#0e1e14,#142a1c)}.tv-forest .tc-label{color:rgba(100,200,140,.35)}
+.tv-sand{background:linear-gradient(135deg,#c8a070,#b08858)}.tv-sand .tc-label{color:rgba(255,255,255,.45)}
+
+.accent-section{margin-top:28px}
+.accent-title{font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:14px;letter-spacing:-.1px}
+.accent-swatches{display:flex;gap:10px;flex-wrap:wrap}
+.accent-swatch{
+  width:34px;height:34px;border-radius:50%;cursor:pointer;
+  transition:transform .2s,box-shadow .2s;border:2.5px solid transparent;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+.accent-swatch:hover{transform:scale(1.2)}
+.accent-swatch.picked{border-color:var(--text);transform:scale(1.15);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+
+.font-section{margin-top:24px}
+.font-opts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.font-opt{
+  padding:14px 18px;border-radius:var(--radius-sm);cursor:pointer;
+  border:1px solid transparent;transition:all .2s;display:flex;align-items:center;gap:12px;
+}
+.font-opt:hover.glass,.font-opt.chosen.glass{border-color:rgba(154,124,82,.3);background:rgba(255,254,252,.82)}
+.font-opt.chosen{box-shadow:var(--glass-shadow)}
+.fo-preview{font-size:20px;letter-spacing:-1px;color:var(--text)}
+.fo-name{font-size:13px;font-weight:500;color:var(--text-2);letter-spacing:-.1px}
+
+/* theme preview panel */
+.theme-preview-panel{
+  padding:24px;border-radius:var(--radius);position:sticky;top:100px;
+}
+.tp-title{font-size:13.5px;font-weight:600;letter-spacing:-.2px;margin-bottom:16px;color:var(--text-2)}
+.tp-watch{
+  width:130px;height:130px;border-radius:32px;margin:0 auto 16px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 12px 32px rgba(0,0,0,.2);transition:all .4s;
+}
+.tp-wtime{font-size:28px;letter-spacing:-2px;line-height:1}
+.tp-wdate{font-size:8px;letter-spacing:2px;margin-top:4px;opacity:.4;font-family:'Geist Mono',monospace}
+.theme-detail{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--text-3);letter-spacing:.5px;text-align:center}
+
+/* ── CLOUD page ── */
+.cloud-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cloud-main{padding:32px;border-radius:var(--radius)}
+.cloud-num{font-family:'Playfair Display',serif;font-size:56px;letter-spacing:-3px;line-height:1;margin-bottom:4px}
+.cloud-num sub{font-family:'Geist',sans-serif;font-size:16px;font-weight:300;color:var(--text-2);letter-spacing:-.5px;bottom:0}
+.storage-track{height:6px;background:rgba(40,30,20,.08);border-radius:100px;overflow:hidden;margin:16px 0 8px}
+.storage-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,#9a7c52,#c4a06e);width:0;transition:width 2s cubic-bezier(.4,0,.2,1)}
+.cloud-meta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-3);font-family:'Geist Mono',monospace}
+.cloud-breakdown{margin-top:24px;display:flex;flex-direction:column;gap:14px}
+.cb-row{display:flex;align-items:center;gap:12px}
+.cb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cb-label{font-size:13.5px;color:var(--text-2);flex:1;letter-spacing:-.1px}
+.cb-bar-wrap{width:80px;height:4px;background:rgba(40,30,20,.08);border-radius:100px;overflow:hidden}
+.cb-bar{height:100%;border-radius:100px}
+.cb-size{font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--text-3);min-width:40px;text-align:right}
+.cloud-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-content:start}
+.mini-cloud-card{padding:22px;border-radius:var(--radius)}
+.mc-icon{font-size:22px;margin-bottom:10px}
+.mc-title{font-size:14px;font-weight:600;letter-spacing:-.2px;margin-bottom:5px}
+.mc-body{font-size:12.5px;font-weight:300;color:var(--text-2);line-height:1.5;letter-spacing:-.1px}
+.mc-action{margin-top:12px}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(100,90,80,.2);border-radius:100px}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);
+  z-index:999;padding:12px 22px;border-radius:100px;
+  font-size:13.5px;font-weight:500;letter-spacing:-.1px;
+  background:rgba(26,24,20,.9);color:#f5f2ee;
+  backdrop-filter:blur(20px);
+  box-shadow:0 8px 32px rgba(0,0,0,.2);
+  transition:transform .4s cubic-bezier(.4,0,.2,1),opacity .4s;
+  opacity:0;pointer-events:none;white-space:nowrap;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ── FADE IN ── */
+.fin{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.4,0,.2,1),transform .7s cubic-bezier(.4,0,.2,1)}
+.fin.vis{opacity:1;transform:none}
+.d1{transition-delay:.08s!important}.d2{transition-delay:.16s!important}.d3{transition-delay:.24s!important}.d4{transition-delay:.32s!important}.d5{transition-delay:.40s!important}.d6{transition-delay:.48s!important}
+</style>
+</head>
+<body>
+<div class="mesh"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="orb o4"></div></div>
+<div class="grain"></div>
+
+<!-- NAVBAR -->
+<nav id="navbar">
+  <div class="nav-logo">Kern</div>
+  <div class="nav-sep"></div>
+  <div class="nav-links">
+    <button class="nav-link active btn" onclick="goPage('home',this)"><div class="ripple-wrap"></div>Watch</button>
+    <button class="nav-link btn" onclick="goPage('features',this)"><div class="ripple-wrap"></div>Features</button>
+    <button class="nav-link btn" onclick="goPage('store',this)"><div class="ripple-wrap"></div>App Store</button>
+    <button class="nav-link btn" onclick="goPage('themes',this)"><div class="ripple-wrap"></div>Themes</button>
+    <button class="nav-link btn" onclick="goPage('cloud',this)"><div class="ripple-wrap"></div>Cloud</button>
+  </div>
+  <div class="nav-sep"></div>
+  <button class="btn btn-dark" onclick="handleEarlyAccess(this)" style="padding:9px 22px;font-size:13px;margin-left:4px"><div class="ripple-wrap"></div>Early Access</button>
+</nav>
+
+<!-- ════ HOME PAGE ════ -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <div class="hero-left">
+      <div class="chip fin vis"><div class="chip-dot"></div>Now in private alpha</div>
+      <h1 class="fin vis d1">Your watch.<br><em>Your OS.</em></h1>
+      <p class="hero-sub fin vis d2">Kern is an open operating system for smartwatches — beautiful by default, endlessly customisable, and truly yours. Build your UI, install any app, own every byte.</p>
+      <div class="hero-actions fin vis d3">
+        <button class="btn btn-dark" onclick="goPage('store',document.querySelector('.nav-link:nth-child(3)'))"><div class="ripple-wrap"></div>Explore App Store</button>
+        <button class="btn btn-glass" onclick="goPage('themes',document.querySelector('.nav-link:nth-child(4)'))"><div class="ripple-wrap"></div>Browse Themes</button>
+        <button class="hero-arrow btn" onclick="goPage('features',document.querySelector('.nav-link:nth-child(2)'))"><div class="ripple-wrap"></div>See all features <span>→</span></button>
+      </div>
+    </div>
+
+    <div class="watch-wrap fin vis d2">
+      <div class="watch-outer" id="watchOuter">
+        <div class="crown c1"></div><div class="crown c2"></div><div class="crown c3"></div>
+        <div class="watch-screen">
+          <!-- Face 0 -->
+          <div class="wface face-serene show" id="wf0">
+            <div class="wt" id="wt0">00:00</div>
+            <div class="ws"></div>
+            <div class="wd" id="wd0">MONDAY</div>
+          </div>
+          <!-- Face 1 -->
+          <div class="wface face-glass" id="wf1">
+            <div class="glass-blob1"></div><div class="glass-blob2"></div><div class="glass-panel"></div>
+            <div class="wt" id="wt1">00:00</div>
+            <div class="wd" id="wd1">MONDAY · MARCH</div>
+          </div>
+          <!-- Face 2 -->
+          <div class="wface face-warm" id="wf2">
+            <div class="gold-ring"></div><div class="gold-ring2"></div>
+            <div class="wt" id="wt2">00:00</div>
+            <div class="wd" id="wd2">MONDAY</div>
+          </div>
+          <!-- Apps -->
+          <div class="apps-overlay" id="appsOverlay">
+            <div class="wapps-grid">
+              <div class="wapp" onclick="openAppFromWatch('Calendar')"><div class="wapp-icon">🗓</div><div class="wapp-name">Calendar</div></div>
+              <div class="wapp" onclick="openAppFromWatch('Fitness')"><div class="wapp-icon">🏃</div><div class="wapp-name">Fitness</div></div>
+              <div class="wapp" onclick="openAppFromWatch('Music')"><div class="wapp-icon">🎵</div><div class="wapp-name">Music</div></div>
+              <div class="wapp" onclick="openAppFromWatch('Weather')"><div class="wapp-icon">🌤</div><div class="wapp-name">Weather</div></div>
+              <div class="wapp" onclick="openAppFromWatch('Messages')"><div class="wapp-icon">💬</div><div class="wapp-name">Messages</div></div>
+              <div class="wapp" onclick="openAppFromWatch('Settings')"><div class="wapp-icon">⚙️</div><div class="wapp-name">Settings</div></div>
+              <div class="wapp" onclick="goPage('store',document.querySelector('.nav-link:nth-child(3)'));closeApps()"><div class="wapp-icon" style="font-size:18px;color:rgba(255,255,255,.3)">+</div><div class="wapp-name">Store</div></div>
+              <div class="wapp" onclick="goPage('cloud',document.querySelector('.nav-link:nth-child(5)'));closeApps()"><div class="wapp-icon">☁️</div><div class="wapp-name">Cloud</div></div>
+              <div class="wapp" onclick="goPage('themes',document.querySelector('.nav-link:nth-child(4)'));closeApps()"><div class="wapp-icon">🎨</div><div class="wapp-name">Themes</div></div>
+            </div>
+            <button class="apps-close" onclick="closeApps()">← home</button>
+          </div>
+        </div>
+      </div>
+      <div class="wpips">
+        <div class="wpip on" onclick="switchFace(0)"></div>
+        <div class="wpip" onclick="switchFace(1)"></div>
+        <div class="wpip" onclick="switchFace(2)"></div>
+      </div>
+      <div class="wtap">tap watch · swipe faces</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ FEATURES PAGE ════ -->
+<div class="page" id="page-features">
+  <div class="page-inner">
+    <div class="page-header">
+      <div class="section-label fin"><div class="sl-line"></div><div class="sl-text">Capabilities</div></div>
+      <div class="page-title fin d1">Open at<br>the <em>core.</em></div>
+      <p class="page-sub fin d2">Every layer is yours — from the rendered glass face to the kernel running beneath. Kern brings the philosophy of open computing to your wrist.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card glass fin d1">
+        <div class="fi">🎨</div><div class="fn">UI Builder</div>
+        <div class="fb">Drag, compose, and code your own watch face. Export themes, share with the community, or keep them private.</div>
+        <span class="ftag">New</span>
+      </div>
+      <div class="feat-card glass fin d2">
+        <div class="fi">📦</div><div class="fn">App Store</div>
+        <div class="fb">Install any Kern-compatible app wirelessly from the cloud. Sideloading fully supported from day one.</div>
+        <span class="ftag">400+ Apps</span>
+      </div>
+      <div class="feat-card glass fin d3">
+        <div class="fi">☁️</div><div class="fn">Cloud Storage</div>
+        <div class="fb">15 GB dedicated cloud per watch. Sync apps, themes, health data and files instantly across all devices.</div>
+        <span class="ftag">15 GB Free</span>
+      </div>
+      <div class="feat-card glass fin d4">
+        <div class="fi">🔧</div><div class="fn">Open Kernel</div>
+        <div class="fb">Linux-based kernel. SSH in, write scripts, automate workflows — full developer access, always.</div>
+      </div>
+      <div class="feat-card glass fin d5">
+        <div class="fi">📱</div><div class="fn">Phone Companion</div>
+        <div class="fb">Manage, design, and configure your watch from the Kern companion app on iOS and Android.</div>
+      </div>
+      <div class="feat-card glass fin d6">
+        <div class="fi">🔒</div><div class="fn">Privacy First</div>
+        <div class="fb">All data encrypted end-to-end. Your cloud, your keys. Zero telemetry. Fully auditable open source.</div>
+      </div>
+    </div>
+    <div style="margin-top:32px;display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-dark" onclick="goPage('store',document.querySelector('.nav-link:nth-child(3)'))"><div class="ripple-wrap"></div>Browse App Store →</button>
+      <button class="btn btn-glass" onclick="goPage('themes',document.querySelector('.nav-link:nth-child(4)'))"><div class="ripple-wrap"></div>Explore Themes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ APP STORE PAGE ════ -->
+<div class="page" id="page-store">
+  <div class="page-inner">
+    <div class="page-header">
+      <div class="section-label fin"><div class="sl-line"></div><div class="sl-text">App Store</div></div>
+      <div class="page-title fin d1">Every app<br>you <em>need.</em></div>
+    </div>
+    <div class="store-search glass fin d2">
+      <span class="icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Search 400+ apps…" oninput="filterApps()">
+    </div>
+    <div class="store-filters fin d2" id="filterBtns">
+      <button class="filter-pill btn on" onclick="setFilter('all',this)"><div class="ripple-wrap"></div>All</button>
+      <button class="filter-pill btn" onclick="setFilter('fitness',this)"><div class="ripple-wrap"></div>Fitness</button>
+      <button class="filter-pill btn" onclick="setFilter('productivity',this)"><div class="ripple-wrap"></div>Productivity</button>
+      <button class="filter-pill btn" onclick="setFilter('health',this)"><div class="ripple-wrap"></div>Health</button>
+      <button class="filter-pill btn" onclick="setFilter('media',this)"><div class="ripple-wrap"></div>Media</button>
+      <button class="filter-pill btn" onclick="setFilter('utility',this)"><div class="ripple-wrap"></div>Utility</button>
+    </div>
+    <div class="apps-grid fin d3" id="appsGrid"></div>
+  </div>
+</div>
+
+<!-- ════ THEMES PAGE ════ -->
+<div class="page" id="page-themes">
+  <div class="page-inner">
+    <div class="page-header">
+      <div class="section-label fin"><div class="sl-line"></div><div class="sl-text">Theme Engine</div></div>
+      <div class="page-title fin d1">Make it<br>truly <em>yours.</em></div>
+    </div>
+    <div class="themes-layout">
+      <div>
+        <div class="theme-grid fin d2" id="themeGrid">
+          <div class="theme-card tv-pearl chosen" onclick="pickTheme(this,'pearl')"><div class="tc-check">✓</div><div class="tc-label" style="color:rgba(40,30,20,.45)">Pearl</div></div>
+          <div class="theme-card tv-midnight" onclick="pickTheme(this,'midnight')"><div class="tc-check">✓</div><div class="tc-label">Midnight</div></div>
+          <div class="theme-card tv-ocean" onclick="pickTheme(this,'ocean')"><div class="tc-check">✓</div><div class="tc-label">Ocean</div></div>
+          <div class="theme-card tv-dusk" onclick="pickTheme(this,'dusk')"><div class="tc-check">✓</div><div class="tc-label">Dusk</div></div>
+          <div class="theme-card tv-forest" onclick="pickTheme(this,'forest')"><div class="tc-check">✓</div><div class="tc-label">Forest</div></div>
+          <div class="theme-card tv-sand" onclick="pickTheme(this,'sand')"><div class="tc-check">✓</div><div class="tc-label">Sand</div></div>
+        </div>
+        <div class="accent-section fin d3">
+          <div class="accent-title">Accent Colour</div>
+          <div class="accent-swatches" id="accentSwatches">
+            <div class="accent-swatch picked" style="background:#9a7c52" onclick="pickAccent(this,'#9a7c52','#c4a06e')"></div>
+            <div class="accent-swatch" style="background:#2a72d8" onclick="pickAccent(this,'#2a72d8','#5a96e8')"></div>
+            <div class="accent-swatch" style="background:#34c759" onclick="pickAccent(this,'#2a8a40','#4ab860')"></div>
+            <div class="accent-swatch" style="background:#e8453c" onclick="pickAccent(this,'#d03030','#e85a52')"></div>
+            <div class="accent-swatch" style="background:#9b5de5" onclick="pickAccent(this,'#7a40c8','#a868e8')"></div>
+            <div class="accent-swatch" style="background:#f4a261" onclick="pickAccent(this,'#c07828','#e09840')"></div>
+          </div>
+        </div>
+        <div class="font-section fin d4">
+          <div class="accent-title">Watch Face Font</div>
+          <div class="font-opts" id="fontOpts">
+            <div class="font-opt glass chosen" onclick="pickFont(this,'serif')">
+              <div class="fo-preview" style="font-family:'Playfair Display',serif;font-style:italic">12:00</div>
+              <div class="fo-name">Playfair — Elegant Serif</div>
+            </div>
+            <div class="font-opt glass" onclick="pickFont(this,'sans')">
+              <div class="fo-preview" style="font-family:'Geist',sans-serif;font-weight:200">12:00</div>
+              <div class="fo-name">Geist — Clean Sans</div>
+            </div>
+            <div class="font-opt glass" onclick="pickFont(this,'mono')">
+              <div class="fo-preview" style="font-family:'Geist Mono',monospace;font-weight:300">12:00</div>
+              <div class="fo-name">Geist Mono — Minimal</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="theme-preview-panel glass fin d2">
+        <div class="tp-title">Live Preview</div>
+        <div class="tp-watch" id="tpWatch">
+          <div class="tp-wtime" id="tpTime">00:00</div>
+          <div class="tp-wdate" id="tpDate">MONDAY</div>
+        </div>
+        <div class="theme-detail" id="themeDetail">Pearl · Gold Accent</div>
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-dark" style="width:100%;justify-content:center" onclick="applyThemeToWatch()"><div class="ripple-wrap"></div>Apply to Watch</button>
+          <button class="btn btn-glass" style="width:100%;justify-content:center" onclick="showToast('Theme exported to cloud ☁️')"><div class="ripple-wrap"></div>Export Theme</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ CLOUD PAGE ════ -->
+<div class="page" id="page-cloud">
+  <div class="page-inner">
+    <div class="page-header">
+      <div class="section-label fin"><div class="sl-line"></div><div class="sl-text">Cloud</div></div>
+      <div class="page-title fin d1">15 GB,<br><em>all yours.</em></div>
+    </div>
+    <div class="cloud-grid">
+      <div class="cloud-main glass fin d2">
+        <div class="cloud-num" id="cloudNum">4.2 <sub>/ 15 GB</sub></div>
+        <div class="storage-track"><div class="storage-fill" id="cloudFill"></div></div>
+        <div class="cloud-meta"><span id="cloudPct">28% used</span><span id="cloudFree">10.8 GB free</span></div>
+        <div class="cloud-breakdown">
+          <div class="cb-row"><div class="cb-dot" style="background:#9a7c52"></div><div class="cb-label">Themes & Faces</div><div class="cb-bar-wrap"><div class="cb-bar" style="background:#9a7c52;width:28%"></div></div><div class="cb-size">1.2 GB</div></div>
+          <div class="cb-row"><div class="cb-dot" style="background:#2a72d8"></div><div class="cb-label">Installed Apps</div><div class="cb-bar-wrap"><div class="cb-bar" style="background:#2a72d8;width:42%"></div></div><div class="cb-size" id="appsCloudSize">1.8 GB</div></div>
+          <div class="cb-row"><div class="cb-dot" style="background:#34c759"></div><div class="cb-label">Health & Fitness</div><div class="cb-bar-wrap"><div class="cb-bar" style="background:#34c759;width:18%"></div></div><div class="cb-size">0.8 GB</div></div>
+          <div class="cb-row"><div class="cb-dot" style="background:#a0a0a0"></div><div class="cb-label">System & Other</div><div class="cb-bar-wrap"><div class="cb-bar" style="background:#a0a0a0;width:10%"></div></div><div class="cb-size">0.4 GB</div></div>
+        </div>
+        <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-dark" onclick="syncCloud()"><div class="ripple-wrap"></div>Sync Now</button>
+          <button class="btn btn-glass" onclick="showToast('Cloud backup started…')"><div class="ripple-wrap"></div>Create Backup</button>
+        </div>
+      </div>
+      <div class="cloud-cards">
+        <div class="mini-cloud-card glass fin d3"><div class="mc-icon">🔒</div><div class="mc-title">End-to-End Encrypted</div><div class="mc-body">All files encrypted with your personal key. Zero knowledge storage.</div></div>
+        <div class="mini-cloud-card glass fin d4"><div class="mc-icon">⚡</div><div class="mc-title">Instant Sync</div><div class="mc-body">Changes reflect across all devices in under 2 seconds.</div></div>
+        <div class="mini-cloud-card glass fin d5"><div class="mc-icon">🌐</div><div class="mc-title">Any Device</div><div class="mc-body">Access your watch data from phone, tablet, or web browser.</div></div>
+        <div class="mini-cloud-card glass fin d6"><div class="mc-icon">♾️</div><div class="mc-title">No Expiry</div><div class="mc-body">Your 15 GB stays yours forever, no subscription required.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── RIPPLE ──
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  const wrap = btn.querySelector('.ripple-wrap');
+  if (!wrap) return;
+  const r = document.createElement('div');
+  r.className = 'ripple';
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 1.2;
+  r.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`;
+  wrap.appendChild(r);
+  setTimeout(() => r.remove(), 700);
+});
+
+// ── CLOCK ──
+function tick() {
+  const n = new Date();
+  const h = String(n.getHours()).padStart(2,'0');
+  const m = String(n.getMinutes()).padStart(2,'0');
+  const t = `${h}:${m}`;
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayUp = days[n.getDay()].toUpperCase();
+  const moUp = months[n.getMonth()].toUpperCase();
+  ['wt0','wt1','wt2'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=t; });
+  const d0=document.getElementById('wd0'); if(d0) d0.textContent=dayUp;
+  const d1=document.getElementById('wd1'); if(d1) d1.textContent=`${dayUp} · ${moUp}`;
+  const d2=document.getElementById('wd2'); if(d2) d2.textContent=dayUp;
+  const tp=document.getElementById('tpTime'); if(tp) tp.textContent=t;
+  const td=document.getElementById('tpDate'); if(td) td.textContent=dayUp;
+}
+tick(); setInterval(tick, 1000);
+
+// ── PAGES ──
+function goPage(id, navEl) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if (navEl) navEl.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+  // trigger animations
+  setTimeout(() => {
+    document.querySelectorAll('#page-'+id+' .fin').forEach(el => el.classList.add('vis'));
+  }, 60);
+  if (id === 'cloud') setTimeout(() => {
+    const f = document.getElementById('cloudFill');
+    if (f) f.style.width = '28%';
+  }, 400);
+}
+// init home
+setTimeout(() => document.querySelectorAll('#page-home .fin').forEach(el => el.classList.add('vis')), 80);
+
+// ── WATCH ──
+let curFace = 0;
+function switchFace(n) {
+  document.getElementById('wf'+curFace).classList.remove('show');
+  document.querySelectorAll('.wpip')[curFace].classList.remove('on');
+  curFace = n;
+  document.getElementById('wf'+n).classList.add('show');
+  document.querySelectorAll('.wpip')[n].classList.add('on');
+}
+document.getElementById('watchOuter').addEventListener('click', e => {
+  if (!document.getElementById('appsOverlay').classList.contains('open')) {
+    document.getElementById('appsOverlay').classList.add('open');
+  }
+});
+function closeApps() { document.getElementById('appsOverlay').classList.remove('open'); }
+
+// swipe on watch
+let swipeStartX = 0;
+document.getElementById('watchOuter').addEventListener('touchstart', e => { swipeStartX = e.touches[0].clientX; });
+document.getElementById('watchOuter').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  if (Math.abs(dx) > 30) switchFace((curFace + (dx < 0 ? 1 : -1) + 3) % 3);
+});
+
+function openAppFromWatch(name) {
+  closeApps();
+  showToast(`Opening ${name}…`);
+}
+
+// ── APP STORE ──
+const APPS = [
+  {name:'RunTrack Pro',desc:'Advanced running & GPS',icon:'🏃',bg:'linear-gradient(135deg,#ff6b6b,#ff8e53)',cat:'fitness',size:'48 MB',stars:'★★★★★',mb:48},
+  {name:'PocketFM',desc:'Offline music & podcasts',icon:'🎵',bg:'linear-gradient(135deg,#4a8fd4,#6ba8e8)',cat:'media',size:'22 MB',stars:'★★★★☆',mb:22},
+  {name:'Zenith',desc:'Mindfulness & breathwork',icon:'🧘',bg:'linear-gradient(135deg,#34a853,#5cbf74)',cat:'health',size:'18 MB',stars:'★★★★★',mb:18},
+  {name:'Nimbus',desc:'Hyper-local weather',icon:'🌤',bg:'linear-gradient(135deg,#4fc3f7,#29b6f6)',cat:'utility',size:'12 MB',stars:'★★★★☆',mb:12},
+  {name:'Vault',desc:'Encrypted password manager',icon:'🔑',bg:'linear-gradient(135deg,#9a7c52,#c4a06e)',cat:'utility',size:'9 MB',stars:'★★★★★',mb:9},
+  {name:'MedLog',desc:'Medication & health tracker',icon:'💊',bg:'linear-gradient(135deg,#e91e63,#f06292)',cat:'health',size:'15 MB',stars:'★★★★☆',mb:15},
+  {name:'Orbital',desc:'Calendar with smart scheduling',icon:'🗓',bg:'linear-gradient(135deg,#7c4dff,#9c74ff)',cat:'productivity',size:'31 MB',stars:'★★★★★',mb:31},
+  {name:'Stride',desc:'Step counter & goals',icon:'👟',bg:'linear-gradient(135deg,#ff7043,#ff8a65)',cat:'fitness',size:'8 MB',stars:'★★★☆☆',mb:8},
+  {name:'Compose',desc:'Voice memos on your wrist',icon:'🎙',bg:'linear-gradient(135deg,#546e7a,#78909c)',cat:'productivity',size:'14 MB',stars:'★★★★☆',mb:14},
+  {name:'SleepWave',desc:'Advanced sleep analysis',icon:'🌙',bg:'linear-gradient(135deg,#1a237e,#3949ab)',cat:'health',size:'20 MB',stars:'★★★★★',mb:20},
+  {name:'Spark',desc:'Quick reply & notifications',icon:'⚡',bg:'linear-gradient(135deg,#f9a825,#ffd54f)',cat:'productivity',size:'6 MB',stars:'★★★★☆',mb:6},
+  {name:'Helm',desc:'Smart home controller',icon:'🏠',bg:'linear-gradient(135deg,#00695c,#00897b)',cat:'utility',size:'26 MB',stars:'★★★★★',mb:26},
+];
+
+const installedApps = new Set();
+let cloudUsedMB = 4200;
+let activeFilter = 'all';
+
+function renderApps() {
+  const grid = document.getElementById('appsGrid');
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = APPS.filter(a =>
+    (activeFilter === 'all' || a.cat === activeFilter) &&
+    (a.name.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q))
+  );
+  grid.innerHTML = filtered.map(a => `
+    <div class="app-card glass${installedApps.has(a.name)?' installed-app':''}" id="card-${a.name.replace(/\s/g,'_')}">
+      <div class="app-ico" style="background:${a.bg}">${a.icon}</div>
+      <div class="app-info">
+        <div class="app-name">${a.name}</div>
+        <div class="app-desc">${a.desc}</div>
+        <div class="app-meta">
+          <div class="app-stars">${a.stars}</div>
+          <div class="app-size">${a.size}</div>
+        </div>
+      </div>
+      <div class="app-actions">
+        <button class="btn btn-install${installedApps.has(a.name)?' installed':''}" id="btn-${a.name.replace(/\s/g,'_')}" onclick="installApp('${a.name}',${a.mb},this)">
+          <div class="ripple-wrap"></div>${installedApps.has(a.name)?'Installed':'Get'}
+        </button>
+        ${installedApps.has(a.name)?`<div class="used-text">${a.size}</div>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function installApp(name, mb, btn) {
+  if (installedApps.has(name)) return;
+  const newUsed = cloudUsedMB + mb;
+  if (newUsed > 15000) { showToast('Not enough cloud storage!'); return; }
+  btn.classList.add('installing');
+  btn.textContent = 'Installing…';
+  setTimeout(() => {
+    installedApps.add(name);
+    cloudUsedMB = newUsed;
+    updateCloudDisplay();
+    renderApps();
+    showToast(`${name} installed successfully ✓`);
+  }, 1200);
+}
+
+function filterApps() { renderApps(); }
+
+function setFilter(cat, el) {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('on'));
+  el.classList.add('on');
+  renderApps();
+}
+
+// ── CLOUD ──
+function updateCloudDisplay() {
+  const gb = (cloudUsedMB / 1000).toFixed(1);
+  const pct = Math.round(cloudUsedMB / 150);
+  const free = (15 - cloudUsedMB/1000).toFixed(1);
+  const n = document.getElementById('cloudNum'); if(n) n.innerHTML = `${gb} <sub>/ 15 GB</sub>`;
+  const p = document.getElementById('cloudPct'); if(p) p.textContent = `${pct}% used`;
+  const f = document.getElementById('cloudFree'); if(f) f.textContent = `${free} GB free`;
+  const fill = document.getElementById('cloudFill'); if(fill) fill.style.width = pct+'%';
+  const ac = document.getElementById('appsCloudSize');
+  if(ac) ac.textContent = (1.8 + (cloudUsedMB-4200)/1000).toFixed(1)+' GB';
+}
+
+function syncCloud() {
+  showToast('Syncing with Kern Cloud…');
+  setTimeout(() => showToast('All data synced ✓'), 2000);
+}
+
+// ── THEMES ──
+const themeMap = {
+  pearl:    { bg:'#eeeae4', bg2:'#e6e1da', text:'#1a1814', surface:'rgba(255,254,252,0.62)', watchBg:'linear-gradient(135deg,#1e1c20,#0d0c0e)', watchText:'#f0ece8', label:'Pearl · Gold Accent' },
+  midnight: { bg:'#111114', bg2:'#16161a', text:'#f0ece8', surface:'rgba(30,28,34,0.65)', watchBg:'linear-gradient(135deg,#0d0c0e,#0a0a0c)', watchText:'#f0ece8', label:'Midnight · Dark' },
+  ocean:    { bg:'#0a1628', bg2:'#0d1c35', text:'#c8dff8', surface:'rgba(15,28,52,0.65)', watchBg:'linear-gradient(135deg,#071020,#0a1628)', watchText:'#9ac8f4', label:'Ocean · Blue' },
+  dusk:     { bg:'#160e22', bg2:'#1e1430', text:'#e0ccf8', surface:'rgba(26,18,40,0.65)', watchBg:'linear-gradient(135deg,#120a1c,#1a1028)', watchText:'#c8a8f0', label:'Dusk · Violet' },
+  forest:   { bg:'#0a1810', bg2:'#0e2016', text:'#b0e8c0', surface:'rgba(12,26,18,0.65)', watchBg:'linear-gradient(135deg,#081010,#0a1814)', watchText:'#80d09a', label:'Forest · Green' },
+  sand:     { bg:'#b89060', bg2:'#a87e50', text:'#2c1808', surface:'rgba(200,160,100,0.55)', watchBg:'linear-gradient(135deg,#1e120a,#140c06)', watchText:'#e8cc90', label:'Sand · Warm' },
+};
+let currentTheme = 'pearl';
+let currentFont = 'serif';
+
+function pickTheme(el, name) {
+  document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('chosen'));
+  el.classList.add('chosen');
+  currentTheme = name;
+  const t = themeMap[name];
+  document.getElementById('themeDetail').textContent = t.label;
+  const w = document.getElementById('tpWatch');
+  w.style.background = t.watchBg;
+  const wt = document.getElementById('tpTime'); wt.style.color = t.watchText;
+  const wd = document.getElementById('tpDate'); wd.style.color = t.watchText+'60';
+  updateFontPreview();
+}
+
+function updateFontPreview() {
+  const fonts = { serif:"'Playfair Display',serif", sans:"'Geist',sans-serif", mono:"'Geist Mono',monospace" };
+  const wt = document.getElementById('tpTime');
+  if (wt) wt.style.fontFamily = fonts[currentFont] || fonts.serif;
+}
+
+function pickFont(el, font) {
+  document.querySelectorAll('.font-opt').forEach(f => f.classList.remove('chosen'));
+  el.classList.add('chosen');
+  currentFont = font;
+  updateFontPreview();
+}
+
+function pickAccent(el, col, light) {
+  document.querySelectorAll('.accent-swatch').forEach(s => s.classList.remove('picked'));
+  el.classList.add('picked');
+  document.documentElement.style.setProperty('--gold', col);
+  document.documentElement.style.setProperty('--gold-light', light);
+  showToast('Accent colour updated');
+}
+
+function applyThemeToWatch() {
+  const t = themeMap[currentTheme];
+  document.documentElement.style.setProperty('--bg', t.bg);
+  document.documentElement.style.setProperty('--bg2', t.bg2);
+  document.documentElement.style.setProperty('--text', t.text);
+  document.documentElement.style.setProperty('--surface', t.surface);
+  showToast(`${t.label} applied ✓`);
+}
+
+// ── TOAST ──
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── CLOUD page storage fill on page enter ──
+function handleEarlyAccess(btn) {
+  showToast('You\'re on the waitlist! We\'ll be in touch 🎉');
+}
+
+// ── INIT ──
+renderApps();
+setTimeout(() => { const f = document.getElementById('cloudFill'); if(f) f.style.width='28%'; }, 500);
+
+// scroll observer
+const obs = new IntersectionObserver(e => e.forEach(en => { if(en.isIntersecting) en.target.classList.add('vis'); }), {threshold:.12});
+document.querySelectorAll('.fin').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
